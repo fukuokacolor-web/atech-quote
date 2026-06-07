@@ -545,10 +545,9 @@ function buildDocHTML(data) {
       </thead>
       <tbody>
         ${itemRows}${blanks}
-        <tr><td colspan="3" class="cen" style="background:#f3f4f6">10%対象 計</td><td class="num" style="background:#f3f4f6">¥${sub.toLocaleString("ja-JP")}</td><td class="num" style="background:#f3f4f6">消費税 ${yen(tax)}</td></tr>
-        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">小計(税抜)</td><td class="num">${yen(sub)}</td></tr>
-        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">消費税(10%)</td><td class="num">${yen(tax)}</td></tr>
-        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#fff8e7;font-weight:700">合計(税込)</td><td class="num" style="font-weight:700">${yen(total)}</td></tr>
+        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">小計（10%対象・税抜）</td><td class="num">${yen(sub)}</td></tr>
+        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">消費税（10%）</td><td class="num">${yen(tax)}</td></tr>
+        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#fff8e7;font-weight:700">合計（税込）</td><td class="num" style="font-weight:700">${yen(total)}</td></tr>
       </tbody>
     </table>
 
