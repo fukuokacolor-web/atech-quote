@@ -503,14 +503,14 @@ function buildDocHTML(data) {
     <div class="doc-title">${lbl.ja.split("").join(" ")}</div>
 
     <div class="doc-issuer">
+      <img class="stamp" src="stamp_anzai.png" alt="印" crossorigin="anonymous">
       <div class="company">${escapeHtml(s.company)}</div>
-      <div>〒${escapeHtml(s.zip)}</div>
-      <div>${escapeHtml(s.address)}</div>
-      <div>TEL：${escapeHtml(s.tel)}</div>
-      <div>担当：${escapeHtml(s.staff)}</div>
-      <div>登録番号：${escapeHtml(s.invoiceNo)}</div>
-      <div class="stamp-wrap">
-        <img class="stamp" src="stamp_anzai.png" alt="印" crossorigin="anonymous">
+      <div class="issuer-info">
+        <div>〒${escapeHtml(s.zip)}</div>
+        <div>${escapeHtml(s.address)}</div>
+        <div>TEL：${escapeHtml(s.tel)}</div>
+        <div>担当：${escapeHtml(s.staff)}</div>
+        <div>登録番号：${escapeHtml(s.invoiceNo)}</div>
       </div>
     </div>
 

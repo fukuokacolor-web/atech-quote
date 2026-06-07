@@ -199,8 +199,8 @@ hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
   font-weight: 700; margin-bottom: 12px; font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
 }
 .doc .doc-left-block {
-  margin-right: 260px;
-  min-height: 200px;
+  margin-right: 290px;
+  min-height: 160px;
 }
 .doc .doc-clear { clear: both; height: 12px; }
 .doc .doc-meta { text-align: left; font-size: 11px; margin-top: 8px; }
@@ -222,15 +222,23 @@ hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
 }
 .doc .doc-issuer {
   float: right;
-  width: 230px;
-  border: 1px solid #000; padding: 8px; font-size: 10.5px;
+  width: 260px;
+  border: 1px solid #000; padding: 8px 50px 8px 8px;
+  font-size: 10.5px;
   background: #fff;
   margin: 0 0 8px 16px;
   line-height: 1.55;
+  position: relative;
 }
-.doc .doc-issuer > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.doc .doc-issuer .stamp-wrap { min-height: 44px; }
-.doc .doc-issuer img.stamp { width: 40px; height: 40px; }
+.doc .doc-issuer .issuer-info > div {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.doc .doc-issuer img.stamp {
+  position: absolute;
+  right: 4px; top: 50%;
+  transform: translateY(-50%);
+  width: 42px; height: 42px;
+}
 .doc .doc-issuer .company { font-weight: 700; font-size: 13px; font-family: "Hiragino Sans", sans-serif; }
 .doc .doc-issuer .stamp-wrap { position: relative; min-height: 60px; }
 .doc .doc-issuer img.stamp {
@@ -304,6 +312,7 @@ hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
   font-size: 14px; font-weight: 700; padding-bottom: 3px;
   border-bottom: 1px solid #999; margin-bottom: 3px;
   letter-spacing: 0.05em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .doc .doc-subject {
   margin-top: 16px; font-size: 14px; font-weight: 700;
