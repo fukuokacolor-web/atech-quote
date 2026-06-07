@@ -590,8 +590,8 @@ document.getElementById("btn-preview").addEventListener("click", () => {
   const data = gatherData();
   data.no = state._previewNo;
   document.getElementById("preview-area").innerHTML = buildDocHTML(data);
-  scalePreview();
   document.getElementById("preview-modal").classList.remove("hidden");
+  requestAnimationFrame(() => requestAnimationFrame(scalePreview));
 });
 document.getElementById("btn-close-preview").addEventListener("click", closePreview);
 document.getElementById("btn-back-edit").addEventListener("click", closePreview);
@@ -604,8 +604,8 @@ function scalePreview() {
   const wrap = document.getElementById("preview-area");
   const doc = wrap.querySelector(".doc");
   if (!doc) return;
-  const containerW = wrap.clientWidth - 16;
-  const scale = Math.min(1, containerW / 794);
+  const containerW = Math.max(200, wrap.clientWidth - 16);
+  const scale = Math.max(0.2, Math.min(1, containerW / 794));
   doc.style.transform = `scale(${scale})`;
   doc.style.marginBottom = `${(1 - scale) * doc.offsetHeight * -1}px`;
 }
