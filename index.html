@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aテック見積">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b5cad">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>Aテック 帳票作成</title>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Aテック 帳票</div>
+  <button id="btn-settings" class="icon-btn" title="設定">⚙</button>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="create">新規発行</button>
+  <button class="tab" data-tab="history">履歴</button>
+  <button class="tab" data-tab="master">マスタ</button>
+</nav>
+
+<main>
+  <!-- ============ 新規発行 ============ -->
+  <section id="tab-create" class="tab-content active">
+    <div class="card">
+      <label class="lbl">帳票種別</label>
+      <div class="seg">
+        <button class="seg-btn active" data-doctype="quote">見積書</button>
+        <button class="seg-btn" data-doctype="delivery">納品書</button>
+        <button class="seg-btn" data-doctype="invoice">請求書</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="lbl">発行日</label>
+      <input type="date" id="issue-date">
+
+      <label class="lbl">宛名（取引先）</label>
+      <div class="row">
+        <input type="text" id="client-name" placeholder="例：一般社団法人 日本自動車連盟 福岡支部">
+        <button class="mini-btn" id="btn-pick-client">📋</button>
+      </div>
+      <button class="link-btn" id="btn-save-client">＋この宛名をマスタ保存</button>
+    </div>
+
+    <div class="card">
+      <label class="lbl">車両情報（任意・JAF案件等）</label>
+      <input type="text" id="vehicle-name" placeholder="車両：筑豊基地 パジェロ">
+      <input type="text" id="vehicle-no" placeholder="車両ナンバー：筑豊300 に 6625">
+    </div>
+
+    <div class="card">
+      <label class="lbl">明細</label>
+      <div id="items-container"></div>
+      <button class="add-btn" id="btn-add-item">＋ 明細を追加</button>
+    </div>
+
+    <div class="card totals-card">
+      <div class="trow"><span>小計</span><span id="sum-subtotal">¥0</span></div>
+      <div class="trow"><span>消費税（10%）</span><span id="sum-tax">¥0</span></div>
+      <div class="trow total"><span>合計（税込）</span><span id="sum-total">¥0</span></div>
+    </div>
+
+    <div class="card">
+      <label class="lbl">備考</label>
+      <textarea id="notes" rows="3" placeholder="・有効期限：発行日より30日間&#10;・納期：別途ご相談"></textarea>
+    </div>
+
+    <div class="card actions">
+      <button class="primary big" id="btn-preview">プレビュー＆PDF発行</button>
+    </div>
+  </section>
+
+  <!-- ============ 履歴 ============ -->
+  <section id="tab-history" class="tab-content">
+    <div class="card">
+      <div class="hist-tools">
+        <input type="text" id="hist-search" placeholder="🔍 宛名・番号で検索">
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ マスタ ============ -->
+  <section id="tab-master" class="tab-content">
+    <div class="card">
+      <h3>取引先マスタ</h3>
+      <div id="clients-list"></div>
+      <div class="row">
+        <input type="text" id="new-client" placeholder="新しい宛名を追加">
+        <button class="mini-btn" id="btn-add-client">＋</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>品名マスタ</h3>
+      <div id="items-master-list"></div>
+      <div class="row col">
+        <input type="text" id="new-item-name" placeholder="品名（例：背面タイヤキャリア加工）">
+        <div class="row">
+          <input type="text" id="new-item-unit" placeholder="単位" style="max-width:80px">
+          <input type="number" id="new-item-price" placeholder="単価（税抜）">
+          <button class="mini-btn" id="btn-add-item-master">＋</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ 設定モーダル ============ -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-content">
+    <header class="modal-head">
+      <h2>設定</h2>
+      <button id="btn-close-settings" class="icon-btn">×</button>
+    </header>
+    <div class="modal-body">
+      <label class="lbl">屋号／会社名</label>
+      <input type="text" id="set-company">
+      <label class="lbl">郵便番号</label>
+      <input type="text" id="set-zip">
+      <label class="lbl">住所</label>
+      <input type="text" id="set-address">
+      <label class="lbl">電話番号</label>
+      <input type="text" id="set-tel">
+      <label class="lbl">担当者名</label>
+      <input type="text" id="set-staff">
+      <label class="lbl">インボイス登録番号</label>
+      <input type="text" id="set-invoice-no" placeholder="T+13桁">
+      <label class="lbl">振込先（銀行・支店・口座種別・番号）</label>
+      <input type="text" id="set-bank" placeholder="福岡銀行 黒崎支店 普通預金 口座番号 0000000">
+      <label class="lbl">口座名義</label>
+      <input type="text" id="set-bank-name">
+      <hr>
+      <h3>データ管理</h3>
+      <button class="secondary" id="btn-export">📤 全データをバックアップ書き出し</button>
+      <label class="file-btn">
+        📥 バックアップを読み込む
+        <input type="file" id="file-import" accept=".json" hidden>
+      </label>
+      <button class="danger" id="btn-reset">⚠ 全データを削除</button>
+    </div>
+    <footer class="modal-foot">
+      <button class="primary" id="btn-save-settings">保存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ プレビュー ============ -->
+<div id="preview-modal" class="modal hidden">
+  <div class="modal-content wide">
+    <header class="modal-head">
+      <h2>プレビュー</h2>
+      <button id="btn-close-preview" class="icon-btn">×</button>
+    </header>
+    <div class="modal-body">
+      <div id="preview-area"></div>
+    </div>
+    <footer class="modal-foot">
+      <button class="secondary" id="btn-back-edit">戻る</button>
+      <button class="primary" id="btn-make-pdf">📄 PDFを作成</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 帳票本体（PDF生成用・画面外に配置） -->
+<div id="doc-canvas-host"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
