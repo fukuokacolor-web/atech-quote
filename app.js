@@ -502,36 +502,34 @@ function buildDocHTML(data) {
   <div class="doc">
     <div class="doc-title">${lbl.ja.split("").join(" ")}</div>
 
-    <div class="doc-header">
-      <div class="doc-header-left">
-        <div class="doc-meta">
-          発行日：${data.date}<br>
-          ${lbl.ja}番号：${data.no}
-          ${parentRef}
-        </div>
-        <div class="doc-to">${escapeHtml(data.client || "")} 御中</div>
-        ${poBlock}
-      </div>
-      <div class="doc-issuer">
-        <div class="company">${escapeHtml(s.company)}</div>
-        <div>〒${escapeHtml(s.zip)}</div>
-        <div>${escapeHtml(s.address)}</div>
-        <div>TEL：${escapeHtml(s.tel)}</div>
-        <div>担当：${escapeHtml(s.staff)}</div>
-        <div>登録番号：${escapeHtml(s.invoiceNo)}</div>
-        <div class="stamp-wrap">
-          <img class="stamp" src="stamp_anzai.png" alt="印" crossorigin="anonymous">
-        </div>
+    <div class="doc-issuer">
+      <div class="company">${escapeHtml(s.company)}</div>
+      <div>〒${escapeHtml(s.zip)}</div>
+      <div>${escapeHtml(s.address)}</div>
+      <div>TEL：${escapeHtml(s.tel)}</div>
+      <div>担当：${escapeHtml(s.staff)}</div>
+      <div>登録番号：${escapeHtml(s.invoiceNo)}</div>
+      <div class="stamp-wrap">
+        <img class="stamp" src="stamp_anzai.png" alt="印" crossorigin="anonymous">
       </div>
     </div>
 
-    <div class="doc-greeting">${lbl.greet}</div>
-
-    <div class="doc-total-line">
-      <span class="label">御${lbl.ja.slice(0,2)}金額</span>
-      <span class="amount">${yen(total)}（税込）</span>
+    <div class="doc-left-block">
+      <div class="doc-meta">
+        発行日：${data.date}<br>
+        ${lbl.ja}番号：${data.no}
+        ${parentRef}
+      </div>
+      <div class="doc-to">${escapeHtml(data.client || "")} 御中</div>
+      ${poBlock}
+      <div class="doc-greeting">${lbl.greet}</div>
+      <div class="doc-total-line">
+        <span class="label">御${lbl.ja.slice(0,2)}金額</span>
+        <span class="amount">${yen(total)}（税込）</span>
+      </div>
     </div>
 
+    <div class="doc-clear"></div>
     ${subjectBlock}
     ${vehicleBlock}
 
