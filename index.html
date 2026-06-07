@@ -28,6 +28,11 @@
 <main>
   <!-- ============ 新規発行 ============ -->
   <section id="tab-create" class="tab-content active">
+    <div id="parent-banner" class="parent-banner hidden">
+      <span>参照元：<b id="parent-banner-text"></b></span>
+      <button id="btn-clear-parent" class="link-btn">クリア</button>
+    </div>
+
     <div class="card">
       <label class="lbl">帳票種別</label>
       <div class="seg">
@@ -47,6 +52,12 @@
         <button class="mini-btn" id="btn-pick-client">📋</button>
       </div>
       <button class="link-btn" id="btn-save-client">＋この宛名をマスタ保存</button>
+
+      <label class="lbl">件名（任意）</label>
+      <input type="text" id="subject" placeholder="例：充電式空気入れ用特注アタッチメント製作の件">
+
+      <label class="lbl">先方発注No（任意）</label>
+      <input type="text" id="po-no" placeholder="例：JAF-2026-0123">
     </div>
 
     <div class="card">
@@ -62,7 +73,7 @@
     </div>
 
     <div class="card totals-card">
-      <div class="trow"><span>小計</span><span id="sum-subtotal">¥0</span></div>
+      <div class="trow"><span>10%対象小計</span><span id="sum-subtotal">¥0</span></div>
       <div class="trow"><span>消費税（10%）</span><span id="sum-tax">¥0</span></div>
       <div class="trow total"><span>合計（税込）</span><span id="sum-total">¥0</span></div>
     </div>
@@ -81,7 +92,25 @@
   <section id="tab-history" class="tab-content">
     <div class="card">
       <div class="hist-tools">
-        <input type="text" id="hist-search" placeholder="🔍 宛名・番号で検索">
+        <input type="text" id="hist-search" placeholder="🔍 宛名・番号・件名で検索">
+        <div class="row">
+          <input type="date" id="hist-date-from" placeholder="開始日">
+          <input type="date" id="hist-date-to" placeholder="終了日">
+        </div>
+        <div class="row">
+          <input type="number" id="hist-amt-min" placeholder="金額下限">
+          <input type="number" id="hist-amt-max" placeholder="金額上限">
+        </div>
+        <div class="row">
+          <select id="hist-type">
+            <option value="">すべての種別</option>
+            <option value="quote">見積書のみ</option>
+            <option value="delivery">納品書のみ</option>
+            <option value="invoice">請求書のみ</option>
+          </select>
+          <button class="mini-btn" id="btn-hist-clear">クリア</button>
+        </div>
+        <div class="hist-summary" id="hist-summary"></div>
       </div>
       <div id="history-list"></div>
     </div>
@@ -138,11 +167,13 @@
       <input type="text" id="set-bank-name">
       <hr>
       <h3>データ管理</h3>
+      <div id="backup-status" class="backup-status"></div>
       <button class="secondary" id="btn-export">📤 全データをバックアップ書き出し</button>
       <label class="file-btn">
         📥 バックアップを読み込む
         <input type="file" id="file-import" accept=".json" hidden>
       </label>
+      <p class="warn-note">⚠ 「全データ削除」は電子帳簿保存法で求められる7年保存に反する可能性があります。実行前に必ずバックアップを取得してください。</p>
       <button class="danger" id="btn-reset">⚠ 全データを削除</button>
     </div>
     <footer class="modal-foot">
@@ -164,6 +195,24 @@
     <footer class="modal-foot">
       <button class="secondary" id="btn-back-edit">戻る</button>
       <button class="primary" id="btn-make-pdf">📄 PDFを作成</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ メール本文モーダル ============ -->
+<div id="mail-modal" class="modal hidden">
+  <div class="modal-content">
+    <header class="modal-head">
+      <h2>メール本文テンプレ</h2>
+      <button id="btn-close-mail" class="icon-btn">×</button>
+    </header>
+    <div class="modal-body">
+      <p>PDFを送付する際の文例です。コピーしてメール／LINEに貼り付けてください。</p>
+      <textarea id="mail-body" rows="14"></textarea>
+    </div>
+    <footer class="modal-foot">
+      <button class="secondary" id="btn-mail-close-2">閉じる</button>
+      <button class="primary" id="btn-mail-copy">📋 コピー</button>
     </footer>
   </div>
 </div>

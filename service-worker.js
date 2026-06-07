@@ -1,4 +1,4 @@
-const CACHE = "atech-quote-v1";
+const CACHE = "atech-quote-v2";
 const ASSETS = [
   "./",
   "./index.html",

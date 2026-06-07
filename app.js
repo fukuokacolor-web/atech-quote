@@ -1,5 +1,14 @@
 /* =========================================
-   Aテック 帳票PWA - app.js
+   Aテック 帳票PWA - app.js (v1.1)
+   Phase 1+2 改修:
+   - 件名 / 先方発注No / 親番号継承
+   - 振込先：請求書のみ、専用ブロック化
+   - 10%対象金額の明示
+   - 屋号強調
+   - 連番のコミット/ロールバック修正
+   - 履歴：append-only / 日付・金額レンジ検索 / 種別フィルタ
+   - メール本文テンプレ自動生成
+   - 最終バックアップ日時の表示
 ========================================= */
 
 const KEY_SETTINGS = "atech_settings_v1";
@@ -7,11 +16,12 @@ const KEY_CLIENTS  = "atech_clients_v1";
 const KEY_ITEMS    = "atech_items_v1";
 const KEY_DOCS     = "atech_docs_v1";
 const KEY_COUNTER  = "atech_counter_v1";
+const KEY_BACKUP_AT = "atech_last_backup_v1";
 
 const DOC_LABELS = {
-  quote:    { ja: "見積書",   en: "Quote",    greet: "下記の通り御見積申し上げます。" },
-  delivery: { ja: "納品書",   en: "Delivery", greet: "下記の通り納品いたします。" },
-  invoice:  { ja: "請求書",   en: "Invoice",  greet: "下記の通りご請求申し上げます。" }
+  quote:    { ja: "見積書",   en: "Quote",    greet: "下記の通り御見積申し上げます。",     closing: "上記の通り御見積申し上げます。",  fileSlug: "見積書" },
+  delivery: { ja: "納品書",   en: "Delivery", greet: "下記の通り納品いたします。",         closing: "上記の通り納品いたしました。ご査収ください。", fileSlug: "納品書" },
+  invoice:  { ja: "請求書",   en: "Invoice",  greet: "下記の通りご請求申し上げます。",     closing: "上記の通りご請求申し上げます。", fileSlug: "請求書" }
 };
 
 const DEFAULT_SETTINGS = {
@@ -34,7 +44,10 @@ const DEFAULT_NOTES_BY_TYPE = {
 /* ====== State ====== */
 let state = {
   docType: "quote",
-  items: []
+  items: [],
+  parentNo: null,
+  parentType: null,
+  _previewNo: null
 };
 
 /* ====== Storage helpers ====== */
@@ -51,20 +64,32 @@ function getClients() { return load(KEY_CLIENTS, []); }
 function getItemsMaster() { return load(KEY_ITEMS, []); }
 function getDocs() { return load(KEY_DOCS, []); }
 
-function nextDocNo(type) {
-  const counter = load(KEY_COUNTER, {});
-  const today = new Date();
-  const ymd = `${today.getFullYear()}${pad(today.getMonth()+1)}${pad(today.getDate())}`;
-  const key = `${type}_${ymd}`;
-  counter[key] = (counter[key] || 0) + 1;
-  save(KEY_COUNTER, counter);
-  const prefix = { quote: "Q", delivery: "D", invoice: "I" }[type];
-  return `A-${ymd}-${prefix}${pad3(counter[key])}`;
-}
-
 const pad = n => String(n).padStart(2, "0");
 const pad3 = n => String(n).padStart(3, "0");
 const yen = n => "¥" + Number(n || 0).toLocaleString("ja-JP");
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+};
+const ymdCompact = dateStr => (dateStr || today()).replace(/-/g, "");
+
+/* ====== 採番（peek/commit分離） ====== */
+function nextDocNoPeek(type, dateStr) {
+  const counter = load(KEY_COUNTER, {});
+  const ymd = ymdCompact(dateStr);
+  const key = `${type}_${ymd}`;
+  const next = (counter[key] || 0) + 1;
+  const prefix = { quote: "Q", delivery: "D", invoice: "I" }[type];
+  return `A-${ymd}-${prefix}${pad3(next)}`;
+}
+function commitDocNo(type, dateStr) {
+  const counter = load(KEY_COUNTER, {});
+  const ymd = ymdCompact(dateStr);
+  const key = `${type}_${ymd}`;
+  counter[key] = (counter[key] || 0) + 1;
+  save(KEY_COUNTER, counter);
+  return counter[key];
+}
 
 /* ====== Tab nav ====== */
 document.querySelectorAll(".tab").forEach(t => {
@@ -90,6 +115,21 @@ document.querySelectorAll(".seg-btn").forEach(b => {
     }
   });
 });
+
+/* ====== Parent banner ====== */
+function setParent(no, type) {
+  state.parentNo = no || null;
+  state.parentType = type || null;
+  const banner = document.getElementById("parent-banner");
+  if (no) {
+    document.getElementById("parent-banner-text").textContent =
+      `${DOC_LABELS[type]?.ja || ""} ${no}`;
+    banner.classList.remove("hidden");
+  } else {
+    banner.classList.add("hidden");
+  }
+}
+document.getElementById("btn-clear-parent").addEventListener("click", () => setParent(null));
 
 /* ====== Items ====== */
 function addItem(data = {}) {
@@ -136,19 +176,20 @@ function renderItems() {
   updateTotals();
 }
 function updateTotals() {
-  let sub = 0;
-  state.items.forEach(it => sub += (+it.qty) * (+it.price));
-  const tax = Math.floor(sub * 0.1);
-  const total = sub + tax;
+  const { sub, tax, total } = totalsOf(state.items);
   document.getElementById("sum-subtotal").textContent = yen(sub);
   document.getElementById("sum-tax").textContent = yen(tax);
   document.getElementById("sum-total").textContent = yen(total);
-  return { sub, tax, total };
+}
+function totalsOf(items) {
+  let sub = 0;
+  items.forEach(it => sub += ((+it.qty) || 0) * ((+it.price) || 0));
+  const tax = Math.floor(sub * 0.1);
+  return { sub, tax, total: sub + tax };
 }
 document.getElementById("btn-add-item").addEventListener("click", () => {
   const master = getItemsMaster();
   if (master.length === 0) { addItem(); return; }
-  // 簡易選択：プロンプトで選ぶ
   const choice = prompt(
     "品名マスタから選択（番号入力）。空欄でカスタム入力：\n" +
     master.map((m, i) => `${i+1}. ${m.name} (${yen(m.price)}/${m.unit})`).join("\n")
@@ -244,7 +285,27 @@ function openSettings() {
   document.getElementById("set-invoice-no").value = s.invoiceNo;
   document.getElementById("set-bank").value = s.bank;
   document.getElementById("set-bank-name").value = s.bankName;
+  updateBackupStatus();
   document.getElementById("settings-modal").classList.remove("hidden");
+}
+function updateBackupStatus() {
+  const last = load(KEY_BACKUP_AT, null);
+  const el = document.getElementById("backup-status");
+  if (!last) {
+    el.textContent = "⚠ 一度もバックアップしていません。Google Drive等への保存を強く推奨します。";
+    el.classList.add("warn");
+    return;
+  }
+  const d = new Date(last);
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  const dateStr = d.toLocaleDateString("ja-JP");
+  if (days > 30) {
+    el.textContent = `⚠ 最終バックアップ：${dateStr}（${days}日前・更新推奨）`;
+    el.classList.add("warn");
+  } else {
+    el.textContent = `✅ 最終バックアップ：${dateStr}（${days}日前）`;
+    el.classList.remove("warn");
+  }
 }
 document.getElementById("btn-settings").addEventListener("click", openSettings);
 document.getElementById("btn-close-settings").addEventListener("click", () =>
@@ -278,8 +339,10 @@ document.getElementById("btn-export").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(all, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `atech_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `atech_backup_${today()}.json`;
   a.click();
+  save(KEY_BACKUP_AT, new Date().toISOString());
+  updateBackupStatus();
 });
 document.getElementById("file-import").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
@@ -300,30 +363,50 @@ document.getElementById("file-import").addEventListener("change", e => {
   r.readAsText(f);
 });
 document.getElementById("btn-reset").addEventListener("click", () => {
-  if (!confirm("すべてのデータを削除します。元に戻せません。本当によろしいですか？")) return;
+  if (!confirm("⚠ 電子帳簿保存法では帳簿の7年保存が義務付けられています。\n\nすべてのデータを削除します。元に戻せません。本当によろしいですか？")) return;
   if (!confirm("最終確認：全データを削除しますか？")) return;
-  [KEY_SETTINGS, KEY_CLIENTS, KEY_ITEMS, KEY_DOCS, KEY_COUNTER].forEach(k => localStorage.removeItem(k));
+  [KEY_SETTINGS, KEY_CLIENTS, KEY_ITEMS, KEY_DOCS, KEY_COUNTER, KEY_BACKUP_AT].forEach(k => localStorage.removeItem(k));
   location.reload();
 });
 
-/* ====== History ====== */
+/* ====== History（拡張検索） ====== */
 function renderHistory() {
   const list = getDocs().slice().reverse();
   const q = document.getElementById("hist-search").value.trim().toLowerCase();
+  const df = document.getElementById("hist-date-from").value;
+  const dt = document.getElementById("hist-date-to").value;
+  const amin = +document.getElementById("hist-amt-min").value || 0;
+  const amax = +document.getElementById("hist-amt-max").value || Infinity;
+  const tp = document.getElementById("hist-type").value;
+
+  const filtered = list.filter(d => {
+    if (q) {
+      const hay = (d.client + " " + d.no + " " + (d.subject || "")).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (df && d.date < df) return false;
+    if (dt && d.date > dt) return false;
+    if (d.total < amin || d.total > amax) return false;
+    if (tp && d.type !== tp) return false;
+    return true;
+  });
+
+  const sum = filtered.reduce((acc, d) => acc + d.total, 0);
+  document.getElementById("hist-summary").textContent =
+    `${filtered.length}件 / 合計 ${yen(sum)}`;
+
   const c = document.getElementById("history-list");
-  const filtered = q ? list.filter(d =>
-    (d.client && d.client.toLowerCase().includes(q)) ||
-    (d.no && d.no.toLowerCase().includes(q))) : list;
-  c.innerHTML = filtered.length ? "" : '<div class="empty">履歴がありません</div>';
+  c.innerHTML = filtered.length ? "" : '<div class="empty">該当なし</div>';
   filtered.forEach(d => {
     const row = document.createElement("div");
     row.className = "hist-item";
     const lbl = DOC_LABELS[d.type].ja;
     const cls = d.type;
+    const subjectLine = d.subject ? `<br>件名：${escapeHtml(d.subject)}` : "";
     row.innerHTML = `
       <div class="hist-item-main">
         <div class="hist-item-title"><span class="tag ${cls}">${lbl}</span>${escapeHtml(d.client || "(宛名未入力)")}</div>
-        <div class="hist-item-sub">${d.no} ／ ${d.date} ／ ${yen(d.total)}</div>
+        <div class="hist-item-sub">${d.no} ／ ${d.date} ／ ${yen(d.total)}${subjectLine}</div>
       </div>
       <div class="hist-item-act">
         <button class="mini-btn" data-act="load" data-id="${d.id}">読込</button>
@@ -334,7 +417,14 @@ function renderHistory() {
   c.querySelectorAll("button[data-act=load]").forEach(b =>
     b.addEventListener("click", () => loadDoc(b.dataset.id)));
 }
-document.getElementById("hist-search").addEventListener("input", renderHistory);
+["hist-search","hist-date-from","hist-date-to","hist-amt-min","hist-amt-max","hist-type"]
+  .forEach(id => document.getElementById(id).addEventListener("input", renderHistory));
+document.getElementById("btn-hist-clear").addEventListener("click", () => {
+  ["hist-search","hist-date-from","hist-date-to","hist-amt-min","hist-amt-max"]
+    .forEach(id => document.getElementById(id).value = "");
+  document.getElementById("hist-type").value = "";
+  renderHistory();
+});
 
 function loadDoc(id) {
   const d = getDocs().find(x => x.id === id);
@@ -342,14 +432,18 @@ function loadDoc(id) {
   document.querySelectorAll(".seg-btn").forEach(x =>
     x.classList.toggle("active", x.dataset.doctype === d.type));
   state.docType = d.type;
-  document.getElementById("issue-date").value = d.date;
+  document.getElementById("issue-date").value = today();  // 新規発行日にする
   document.getElementById("client-name").value = d.client || "";
+  document.getElementById("subject").value = d.subject || "";
+  document.getElementById("po-no").value = d.poNo || "";
   document.getElementById("vehicle-name").value = d.vehicleName || "";
   document.getElementById("vehicle-no").value = d.vehicleNo || "";
   document.getElementById("notes").value = d.notes || "";
   state.items = JSON.parse(JSON.stringify(d.items || []));
   renderItems();
+  setParent(d.no, d.type);  // 親番号を継承
   document.querySelector('.tab[data-tab=create]').click();
+  alert(`「${DOC_LABELS[d.type].ja} ${d.no}」を読み込みました。\n帳票種別を切り替えて新規発行できます。`);
 }
 
 /* ====== Build document HTML ====== */
@@ -365,7 +459,7 @@ function buildDocHTML(data) {
       <td class="num">${yen(((+it.qty)||0) * ((+it.price)||0))}</td>
     </tr>
   `).join("");
-  const blankRows = Math.max(0, 4 - data.items.length);
+  const blankRows = Math.max(0, 3 - data.items.length);
   const blanks = '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>'.repeat(blankRows);
   const s = data.settings;
   const vehicleBlock = (data.vehicleName || data.vehicleNo) ? `
@@ -376,19 +470,49 @@ function buildDocHTML(data) {
     </div>
   ` : "";
 
+  // 振込先：請求書のみ独立ブロック
+  const bankBlock = (data.type === "invoice") ? `
+    <div class="doc-bank">
+      <div class="bank-title">お振込先</div>
+      <table>
+        <tr><td class="label">銀行</td><td class="value">${escapeHtml(s.bank)}</td></tr>
+        <tr><td class="label">口座名義</td><td class="value">${escapeHtml(s.bankName)}</td></tr>
+      </table>
+    </div>
+  ` : "";
+
+  // 親番号参照
+  const parentRef = data.parentNo ? `
+    <div class="doc-parent-ref">
+      ※${DOC_LABELS[data.parentType]?.ja || ""}番号 ${escapeHtml(data.parentNo)} に基づく
+    </div>
+  ` : "";
+
+  // 件名
+  const subjectBlock = data.subject ? `
+    <div class="doc-subject">件名：${escapeHtml(data.subject)}</div>
+  ` : "";
+
+  // 先方発注No
+  const poBlock = data.poNo ? `
+    <div class="doc-po-ref">貴社発注No：${escapeHtml(data.poNo)}</div>
+  ` : "";
+
   return `
   <div class="doc">
     <div class="doc-title">${lbl.ja.split("").join(" ")}</div>
     <div class="doc-meta">
       発行日：${data.date}<br>
       ${lbl.ja}番号：${data.no}
+      ${parentRef}
     </div>
     <div class="doc-to">${escapeHtml(data.client || "")} 御中</div>
+    ${poBlock}
     <div class="doc-greeting">${lbl.greet}</div>
 
     <div class="doc-total-line">
       <span class="label">御${lbl.ja.slice(0,2)}金額</span>
-      <span class="amount">${yen(total)}-（税込）</span>
+      <span class="amount">${yen(total)}（税込）</span>
     </div>
 
     <div class="doc-issuer">
@@ -403,6 +527,7 @@ function buildDocHTML(data) {
       </div>
     </div>
 
+    ${subjectBlock}
     ${vehicleBlock}
 
     <table class="items">
@@ -417,40 +542,41 @@ function buildDocHTML(data) {
       </thead>
       <tbody>
         ${itemRows}${blanks}
-        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">小計</td><td class="num">${yen(sub)}</td></tr>
+        <tr><td colspan="3" class="cen" style="background:#f3f4f6">10%対象 計</td><td class="num" style="background:#f3f4f6">¥${sub.toLocaleString("ja-JP")}</td><td class="num" style="background:#f3f4f6">消費税 ${yen(tax)}</td></tr>
+        <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">小計(税抜)</td><td class="num">${yen(sub)}</td></tr>
         <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#f3f4f6">消費税(10%)</td><td class="num">${yen(tax)}</td></tr>
         <tr><td colspan="3" style="border:none"></td><td class="cen" style="background:#fff8e7;font-weight:700">合計(税込)</td><td class="num" style="font-weight:700">${yen(total)}</td></tr>
       </tbody>
     </table>
 
+    ${bankBlock}
+
     <div class="doc-notes">
       <div class="nt-title">備考</div>
-      <pre>${escapeHtml(data.notes || "")}
-${(data.type==="invoice"||data.type==="quote") ? `・お振込先：${escapeHtml(s.bank)}\n　　　　　　口座名義：${escapeHtml(s.bankName)}` : ""}</pre>
+      <pre>${escapeHtml(data.notes || "")}</pre>
     </div>
+
+    <div class="doc-closing">${lbl.closing}</div>
   </div>
   `;
-}
-
-function totalsOf(items) {
-  let sub = 0;
-  items.forEach(it => sub += ((+it.qty) || 0) * ((+it.price) || 0));
-  const tax = Math.floor(sub * 0.1);
-  return { sub, tax, total: sub + tax };
 }
 
 /* ====== Preview ====== */
 function gatherData() {
   return {
     type: state.docType,
-    date: document.getElementById("issue-date").value,
-    no: state._previewNo || nextDocNo(state.docType),
+    date: document.getElementById("issue-date").value || today(),
+    no: state._previewNo || nextDocNoPeek(state.docType, document.getElementById("issue-date").value),
     client: document.getElementById("client-name").value.trim(),
+    subject: document.getElementById("subject").value.trim(),
+    poNo: document.getElementById("po-no").value.trim(),
     vehicleName: document.getElementById("vehicle-name").value.trim(),
     vehicleNo: document.getElementById("vehicle-no").value.trim(),
     notes: document.getElementById("notes").value,
     items: state.items,
-    settings: getSettings()
+    settings: getSettings(),
+    parentNo: state.parentNo,
+    parentType: state.parentType
   };
 }
 
@@ -459,7 +585,8 @@ document.getElementById("btn-preview").addEventListener("click", () => {
   if (!document.getElementById("client-name").value.trim()) {
     if (!confirm("宛名が空です。続けますか？")) return;
   }
-  state._previewNo = nextDocNoPeek(state.docType);
+  // プレビュー毎に番号は再計算（種別/日付変更に追随）
+  state._previewNo = nextDocNoPeek(state.docType, document.getElementById("issue-date").value);
   const data = gatherData();
   data.no = state._previewNo;
   document.getElementById("preview-area").innerHTML = buildDocHTML(data);
@@ -484,25 +611,6 @@ function scalePreview() {
 }
 window.addEventListener("resize", scalePreview);
 
-/* nextDocNoPeek: 番号を確定せず採番候補だけ取得 */
-function nextDocNoPeek(type) {
-  const counter = load(KEY_COUNTER, {});
-  const today = new Date();
-  const ymd = `${today.getFullYear()}${pad(today.getMonth()+1)}${pad(today.getDate())}`;
-  const key = `${type}_${ymd}`;
-  const next = (counter[key] || 0) + 1;
-  const prefix = { quote: "Q", delivery: "D", invoice: "I" }[type];
-  return `A-${ymd}-${prefix}${pad3(next)}`;
-}
-function commitDocNo(type) {
-  const counter = load(KEY_COUNTER, {});
-  const today = new Date();
-  const ymd = `${today.getFullYear()}${pad(today.getMonth()+1)}${pad(today.getDate())}`;
-  const key = `${type}_${ymd}`;
-  counter[key] = (counter[key] || 0) + 1;
-  save(KEY_COUNTER, counter);
-}
-
 /* ====== PDF生成 ====== */
 document.getElementById("btn-make-pdf").addEventListener("click", async () => {
   const btn = document.getElementById("btn-make-pdf");
@@ -514,7 +622,6 @@ document.getElementById("btn-make-pdf").addEventListener("click", async () => {
     host.innerHTML = buildDocHTML(data);
     const docEl = host.querySelector(".doc");
 
-    // 画像読み込み待ち
     const imgs = docEl.querySelectorAll("img");
     await Promise.all([...imgs].map(im =>
       im.complete ? Promise.resolve() : new Promise(r => { im.onload = r; im.onerror = r; })
@@ -533,37 +640,40 @@ document.getElementById("btn-make-pdf").addEventListener("click", async () => {
     const x = (pageW - w) / 2, y = 0;
     pdf.addImage(img, "JPEG", x, y, w, h);
 
-    const lbl = DOC_LABELS[data.type].ja;
-    const fname = `${lbl}_${(data.client || "宛名なし").slice(0,20)}_${data.date}_${data.no}.pdf`;
+    const lbl = DOC_LABELS[data.type];
+    const clientSlug = (data.client || "宛名なし").slice(0, 20);
+    const subjectSlug = data.subject ? "_" + data.subject.slice(0, 15) : "";
+    const fname = `${lbl.fileSlug}_${clientSlug}${subjectSlug}_${data.date}_${data.no}.pdf`;
 
-    // 履歴保存 & 採番確定
-    commitDocNo(data.type);
+    // 採番確定 → append-only保存
+    commitDocNo(data.type, data.date);
     const docs = getDocs();
+    const totals = totalsOf(data.items);
     docs.push({
       id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
       type: data.type, no: data.no, date: data.date,
-      client: data.client, vehicleName: data.vehicleName, vehicleNo: data.vehicleNo,
+      client: data.client, subject: data.subject, poNo: data.poNo,
+      vehicleName: data.vehicleName, vehicleNo: data.vehicleNo,
       notes: data.notes, items: data.items,
-      total: totalsOf(data.items).total,
+      subtotal: totals.sub, tax: totals.tax, total: totals.total,
+      taxRate10Base: totals.sub,
+      parentNo: data.parentNo, parentType: data.parentType,
       createdAt: new Date().toISOString()
     });
     save(KEY_DOCS, docs);
 
-    // モバイル：Web Share API でファイル共有を試す → ダメならダウンロード
+    // 共有 or ダウンロード
     const blob = pdf.output("blob");
     const file = new File([blob], fname, { type: "application/pdf" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: fname });
-      } catch (e) {
-        // 共有キャンセル時はダウンロードにフォールバック
-        triggerDownload(blob, fname);
-      }
+      try { await navigator.share({ files: [file], title: fname }); }
+      catch (e) { triggerDownload(blob, fname); }
     } else {
       triggerDownload(blob, fname);
     }
     closePreview();
-    alert("PDFを作成しました。");
+    // メール本文テンプレ提示
+    showMailTemplate(data);
   } catch (e) {
     console.error(e);
     alert("PDF作成中にエラーが発生しました。\n" + e.message);
@@ -581,6 +691,57 @@ function triggerDownload(blob, fname) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/* ====== メール本文テンプレ ====== */
+function showMailTemplate(data) {
+  const s = data.settings;
+  const lbl = DOC_LABELS[data.type];
+  const clientLine = data.client ? `${data.client} 御中\n\nご担当者様` : "ご担当者様";
+  const subjectLine = data.subject ? `\n（件名：${data.subject}）` : "";
+  const refLine = data.poNo ? `\n貴社発注No：${data.poNo}` : "";
+  const totals = totalsOf(data.items);
+  const bankLine = (data.type === "invoice")
+    ? `\n\n【お振込先】\n　${s.bank}\n　口座名義：${s.bankName}\n　※お振込手数料は貴社にてご負担願います。`
+    : "";
+
+  const body = `${clientLine}
+
+平素より大変お世話になっております。
+${s.company} ${s.staff}でございます。
+
+${lbl.ja}（${data.no}）をお送りいたします。${subjectLine}${refLine}
+
+合計金額：${yen(totals.total)}（税込）
+
+ご査収のほどよろしくお願いいたします。
+ご不明点等ございましたらお気軽にご連絡ください。${bankLine}
+
+―――――――――――――――――――
+${s.company}
+〒${s.zip} ${s.address}
+TEL：${s.tel}
+担当：${s.staff}
+登録番号：${s.invoiceNo}
+―――――――――――――――――――`;
+
+  document.getElementById("mail-body").value = body;
+  document.getElementById("mail-modal").classList.remove("hidden");
+}
+document.getElementById("btn-close-mail").addEventListener("click", () =>
+  document.getElementById("mail-modal").classList.add("hidden"));
+document.getElementById("btn-mail-close-2").addEventListener("click", () =>
+  document.getElementById("mail-modal").classList.add("hidden"));
+document.getElementById("btn-mail-copy").addEventListener("click", async () => {
+  const txt = document.getElementById("mail-body").value;
+  try {
+    await navigator.clipboard.writeText(txt);
+    alert("コピーしました。メール／LINEに貼り付けてください。");
+  } catch {
+    document.getElementById("mail-body").select();
+    document.execCommand("copy");
+    alert("コピーしました。");
+  }
+});
+
 /* ====== Utils ====== */
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -590,9 +751,9 @@ function escapeHtml(s) {
 
 /* ====== Initial ====== */
 function init() {
-  document.getElementById("issue-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("issue-date").value = today();
   document.getElementById("notes").value = DEFAULT_NOTES_BY_TYPE.quote;
-  addItem(); // 1行用意
+  addItem();
 }
 init();
 

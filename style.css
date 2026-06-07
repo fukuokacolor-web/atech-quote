@@ -246,3 +246,72 @@ hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
 .empty {
   text-align: center; color: #9ca3af; padding: 24px 0; font-size: 14px;
 }
+
+/* === Parent banner (見積→納品→請求 参照) === */
+.parent-banner {
+  background: #fef3c7; border-left: 4px solid #f59e0b;
+  border-radius: 6px; padding: 10px 12px;
+  margin-bottom: 12px; font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.parent-banner.hidden { display: none; }
+.parent-banner b { color: #92400e; }
+
+/* === History extended search === */
+.hist-tools input, .hist-tools select { margin-bottom: 6px; }
+.hist-summary {
+  font-size: 12px; color: #4b5563; padding: 6px 0;
+}
+
+/* === Backup status === */
+.backup-status {
+  font-size: 12px; color: #6b7280; padding: 6px 8px;
+  background: #f9fafb; border-radius: 6px; margin-bottom: 8px;
+}
+.backup-status.warn { color: #92400e; background: #fef3c7; }
+.warn-note {
+  font-size: 11px; color: #92400e; background: #fef3c7;
+  padding: 8px; border-radius: 6px; margin: 8px 0;
+}
+
+/* === Mail textarea === */
+#mail-body {
+  width: 100%; min-height: 200px;
+  font-family: ui-monospace, "Courier New", monospace; font-size: 13px;
+  padding: 10px; border: 1px solid #d1d5db; border-radius: 8px;
+}
+
+/* === 帳票本体追加スタイル === */
+.doc .doc-issuer .company {
+  font-size: 16px; font-weight: 700; padding-bottom: 4px;
+  border-bottom: 1px solid #999; margin-bottom: 4px;
+  letter-spacing: 0.05em;
+}
+.doc .doc-subject {
+  margin-top: 16px; font-size: 14px; font-weight: 700;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  border-left: 3px solid #000; padding-left: 8px;
+}
+.doc .doc-parent-ref {
+  font-size: 10px; color: #555; margin-top: 4px;
+}
+.doc .doc-po-ref {
+  font-size: 11px; color: #000; margin-top: 6px;
+}
+.doc .doc-bank {
+  margin-top: 14px; border: 2px solid #000; padding: 10px;
+  font-size: 11px;
+}
+.doc .doc-bank .bank-title {
+  font-weight: 700; font-size: 12px; margin-bottom: 4px;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  background: #000; color: #fff; padding: 2px 6px; display: inline-block;
+}
+.doc .doc-bank table { border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+.doc .doc-bank td { padding: 3px 12px 3px 0; vertical-align: top; }
+.doc .doc-bank td.label { color: #555; width: 70px; }
+.doc .doc-bank td.value { font-family: ui-monospace, "Courier New", monospace; font-weight: 700; }
+.doc .doc-closing {
+  margin-top: 18px; font-size: 11px; text-align: center;
+}
+
